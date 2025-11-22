@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Gestor de Tareas</title>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css" />
+	<meta name="description" content="Gestor de tareas simple con HTML, CSS y JavaScript (localStorage)." />
+</head>
+<body>
+	<div class="app">
+		<header class="app-header">
+			<div class="title-wrap">
+				<h1>Gestor de Tareas</h1>
+				<p class="subtitle">Simple • Minimalista • Responsive</p>
+			</div>
+			<button id="themeToggle" class="btn icon-btn" aria-label="Alternar modo oscuro">🌓</button>
+		</header>
+
+		<main>
+			<section class="card form-card">
+				<form id="taskForm" class="task-form" autocomplete="off">
+					<input id="taskInput" type="text" placeholder="Agregar nueva tarea..." aria-label="Nueva tarea" required />
+					<button type="submit" class="btn">Agregar</button>
+				</form>
+				<div class="filters">
+					<button class="filter-btn active" data-filter="all">Todas</button>
+					<button class="filter-btn" data-filter="pending">Pendientes</button>
+					<button class="filter-btn" data-filter="completed">Completadas</button>
+				</div>
+			</section>
+
+			<section class="card list-card">
+				<ul id="taskList" class="task-list" aria-live="polite"></ul>
+			</section>
+		</main>
+
+		<footer class="app-footer">
+			<small>Hecho con ♥ — Proyecto de práctica</small>
+		</footer>
+	</div>
+
+	<script src="script.js" defer></script>
+</body>
+</html>

@@ -4,6 +4,8 @@ const THEME_KEY = 'gestor.theme.v1';
 
 const taskForm = document.getElementById('taskForm');
 const taskInput = document.getElementById('taskInput');
+const taskPriority = null; // prioridad eliminada — mantenemos referencia nula por compatibilidad
+const taskDue = document.getElementById('taskDue');
 const taskList = document.getElementById('taskList');
 const filterButtons = document.querySelectorAll('.filter-btn');
 const themeToggle = document.getElementById('themeToggle');
@@ -22,8 +24,10 @@ function bindEvents(){
 		e.preventDefault();
 		const text = taskInput.value.trim();
 		if(!text) return;
-		addTask(text);
+		const due = taskDue.value || null; // ISO date string or null
+		addTask(text, due);
 		taskInput.value = '';
+		taskDue.value = '';
 		taskInput.focus();
 	});
 
@@ -52,7 +56,7 @@ function bindEvents(){
 		} else if(e.target.matches('.action-edit')){
 			startEditTask(id, li);
 		} else if(e.target.matches('input[type="checkbox"]')){
-			toggleComplete(id, e.target.checked, li);
+			toggleComplete(id, e.target.checked);
 		}
 	});
 }
@@ -74,8 +78,8 @@ function saveTasks(){
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
 }
 
-function addTask(text){
-	const task = { id: String(Date.now()), text, completed:false, created: Date.now() };
+function addTask(text, due = null){
+	const task = { id: String(Date.now()), text, completed:false, created: Date.now(), due };
 	tasks.unshift(task);
 	saveTasks();
 	renderTasks(()=>{
@@ -85,27 +89,40 @@ function addTask(text){
 }
 
 function startEditTask(id, li){
-	const span = li.querySelector('.task-text');
-	const old = span.textContent;
-	const input = document.createElement('input');
-	input.type = 'text'; input.value = old; input.className = 'edit-input';
-	input.style.width = '100%';
-	span.replaceWith(input);
+	const t = tasks.find(x=>x.id===id);
+	if(!t) return;
+	// Crear formulario inline (solo texto y fecha)
+	const form = document.createElement('form');
+	form.className = 'inline-edit';
+	form.innerHTML = `
+		<input type="text" name="text" value="${escapeHtml(t.text)}" required />
+		<input type="date" name="due" value="${t.due ? t.due : ''}" />
+		<button type="submit" class="btn">Guardar</button>
+		<button type="button" class="btn cancel">Cancelar</button>
+	`;
+	// Reemplazar contenido del li.left
+	const left = li.querySelector('.left');
+	left.style.display = 'block';
+	left.innerHTML = '';
+	left.appendChild(form);
+
+	const input = form.querySelector('input[name="text"]');
 	input.focus();
 
-	function done(save){
-		const newText = input.value.trim();
-		if(save && newText){
-			const t = tasks.find(t=>t.id===id);
-			if(t){ t.text = newText; saveTasks(); }
+	form.addEventListener('submit', (e)=>{
+		e.preventDefault();
+		const newText = form.querySelector('input[name="text"]').value.trim();
+		const newDue = form.querySelector('input[name="due"]').value || null;
+		if(newText){
+			t.text = newText;
+			t.due = newDue;
+			saveTasks();
+			renderTasks();
 		}
-		renderTasks();
-	}
+	});
 
-	input.addEventListener('blur', () => done(true));
-	input.addEventListener('keydown', (e)=>{
-		if(e.key === 'Enter'){ input.blur(); }
-		if(e.key === 'Escape'){ done(false); }
+	form.querySelector('.cancel').addEventListener('click', ()=>{
+		renderTasks();
 	});
 }
 
@@ -119,7 +136,7 @@ function removeTask(id, li){
 	}, { once:true });
 }
 
-function toggleComplete(id, checked, li){
+function toggleComplete(id, checked){
 	const t = tasks.find(t=>t.id===id);
 	if(!t) return;
 	t.completed = !!checked;
@@ -127,13 +144,32 @@ function toggleComplete(id, checked, li){
 	renderTasks();
 }
 
+function sortTasks(arr){
+	return arr.slice().sort((a,b) => {
+		// Primero por fecha: tareas con fecha aparecen antes (las más próximas primero). Sin fecha -> al final
+		if(a.due && b.due){
+			if(a.due < b.due) return -1;
+			if(a.due > b.due) return 1;
+		} else if(a.due && !b.due){
+			return -1;
+		} else if(!a.due && b.due){
+			return 1;
+		}
+		// Finalmente por creación (más reciente arriba)
+		return b.created - a.created;
+	});
+}
+
 function renderTasks(cb){
 	// filtrado
-	const filtered = tasks.filter(t => {
+	let filtered = tasks.filter(t => {
 		if(filter === 'all') return true;
 		if(filter === 'pending') return !t.completed;
 		if(filter === 'completed') return t.completed;
 	});
+
+	// ordenar
+	filtered = sortTasks(filtered);
 
 	// construir HTML
 	taskList.innerHTML = '';
@@ -147,10 +183,12 @@ function renderTasks(cb){
 			const li = document.createElement('li');
 			li.className = 'task-item';
 			li.dataset.id = t.id;
+			const dueLabel = t.due ? formatDate(t.due) : '';
 			li.innerHTML = `
 				<div class="left">
 					<input type="checkbox" ${t.completed ? 'checked' : ''} aria-label="Marcar tarea" />
 					<span class="task-text ${t.completed ? 'completed' : ''}">${escapeHtml(t.text)}</span>
+					${ dueLabel ? `<span class="due">${dueLabel}</span>` : '' }
 				</div>
 				<div class="actions">
 					<button class="action-btn action-edit" title="Editar" aria-label="Editar tarea">✏️</button>
@@ -163,6 +201,14 @@ function renderTasks(cb){
 	if(typeof cb === 'function') cb();
 }
 
+function formatDate(iso){
+	try{
+		const d = new Date(iso);
+		if(isNaN(d)) return iso;
+		return d.toLocaleDateString();
+	}catch(e){ return iso; }
+}
+
 function escapeHtml(s){
-	return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+	return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

@@ -203,7 +203,18 @@ function renderTasks(cb){
 
 function formatDate(iso){
 	try{
-		const d = new Date(iso);
+		if(!iso) return '';
+		// Si la cadena viene en formato "YYYY-MM-DD" (input[type=date])
+		// crear la fecha usando componentes locales para evitar desplazamientos
+		// causados por interpretación como UTC en algunos navegadores (Safari/iOS).
+		const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+		let d;
+		if(isoDateOnly){
+			const [y, m, day] = iso.split('-').map(Number);
+			d = new Date(y, m - 1, day);
+		} else {
+			d = new Date(iso);
+		}
 		if(isNaN(d)) return iso;
 		return d.toLocaleDateString();
 	}catch(e){ return iso; }
